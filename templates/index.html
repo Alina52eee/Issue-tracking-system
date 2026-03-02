@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  <meta charset="utf-8" />
+  <title>Трекер поддержки</title>
+</head>
+<body>
+  <h1>Трекер поддержки</h1>
+  <p>Главная страница приложения.</p>
+  <p>База данных: {% if db_ok %}<strong>OK</strong>{% else %}Ошибка{% endif %}</p>
+</body>
+</html>
