@@ -1,13 +1,28 @@
-from flask import Flask, session, render_template, request, url_for, redirect
-import sqlite3
+
 from werkzeug.security import check_password_hash, generate_password_hash
-
-app = Flask(__name__)
-app.secret_key = "dev-secret"  # в продакшене — случайная строка из переменной окружения
-
-DB_PATH = "database.db"
+from flask import   # если ещё не импортированы
+from datetime import datetime
 
 
+
+def is_logged_in():
+    return session.get("user_id") is not None
+
+def current_user():
+    user_id = session.get("user_id")
+    if user_id is None:
+        return None
+
+    conn = get_conn()
+    user = conn.execute(
+        "SELECT * FROM users WHERE id = ? AND archived_at IS NULL",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+
+    return user
+
+'''
 def current_user():
     """Возвращает строку текущего пользователя (dict-like) или None."""
     uid = session.get("user_id")
@@ -20,7 +35,7 @@ def current_user():
     ).fetchone()
     conn.close()
     return user
-
+'''
 
 
 def get_conn():
@@ -29,6 +44,8 @@ def get_conn():
     conn.execute("PRAGMA foreign_keys = ON")  # включить внешние ключи (пригодятся позже)
     return conn
 
+
+'''
 @app.route("/")
 def home():
     conn = get_conn()
@@ -38,130 +55,327 @@ def home():
         print(dict(r))
     conn.close()
     return render_template("index.html", db_ok=row is not None and row["ok"] == 1)
+'''
 
-@app.get("/")
-def home():
+def create_user(username, password, role):
+    """
+    Создать пользователя с указанным логином, паролем и ролью.
+    На этом этапе пароль сохраняется как есть (будем улучшать позже).
+    """
+    password_hash = generate_password_hash(password)
+
     conn = get_conn()
-    row = conn.execute("SELECT 1 AS ok").fetchone()
+    conn.execute(
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        (username, password_hash, role),
+    )
+    conn.commit()
     conn.close()
-    return render_template(
-        "home.html",
-        db_ok=row is not None and row["ok"] == 1,
-        current_user=current_user,
-    )    
 
 def init_db():
+    """Создать таблицу users, если её ещё нет."""
     conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('agent', 'admin')),
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('user', 'admin')),
             archived_at TEXT,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
         )
+    """)  # Добавлены скобки () и правильно закрыта строка
+    
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
     """)
+    conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('registration_open', '0')")
+    
     conn.commit()
     conn.close()
 
 
-
-def ensure_master():
-    """Создать пользователя master (admin), если ещё нет ни одного admin."""
+def get_registration_open():
     conn = get_conn()
-    row = conn.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone()
-    if row is not None:
-        conn.close()
-        return
+    row = conn.execute("SELECT value FROM settings WHERE key = 'registration_open'").fetchone()
+    conn.close()
+    return row is not None and row["value"] == "1"
+
+def insert_test_user():
+    """Добавить одного тестового пользователя (для проверки таблицы)."""
+    conn = get_conn()
     conn.execute(
-        "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')",
-        ("master", generate_password_hash("master")),
+        "INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, 'user')",
+        ("testuser", "placeholder_hash"),
     )
     conn.commit()
     conn.close()
 
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    # Если уже авторизован - редирект на дашборд
-    if "user_id" in session:
-        return redirect("/")
-    
-    # GET запрос или ошибки POST - показываем форму
-    if request.method == "GET":
-        next_url = request.args.get("next")
-        return render_template("login.html", next=next_url)
-    
-    # POST запрос - обработка входа
-    username = (request.form.get("username") or "").strip()
-    password = request.form.get("password") or ""
-    
-    if not username or not password:
-        return render_template("login.html", 
-                             next=request.form.get("next"), 
-                             error="Введите логин и пароль"), 400
-    
+def show_table():
+    """
+    Вернуть содержимое таблицы users как список строк.
+    Удобно вызывать из консоли: print(show_table()).
+    """
     conn = get_conn()
-    user = conn.execute(
-        "SELECT id, password_hash, role FROM users WHERE username = ? AND archived_at IS NULL",
-        (username,)
-    ).fetchone()
+    rows = conn.execute(
+        "SELECT * FROM users ORDER BY id"
+    ).fetchall()
     conn.close()
-    
-    if user is None or not check_password_hash(user["password_hash"], password):
-        return render_template("login.html", 
-                             next=request.form.get("next"), 
-                             error="Неверный логин или пароль"), 401
+    return [dict(row) for row in rows]
 
+def ensure_master():
+    """
+    Убедиться, что в системе есть хотя бы один администратор.
+    Если нет — создать пользователя master/master с ролью admin.
+    """
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM users WHERE role = 'admin' AND archived_at IS NULL LIMIT 1"
+    ).fetchone()
+
+    if row is None:
+        create_user("master", "master", "admin")
+
+    conn.close()
+
+def get_registration_open():
+    conn = get_conn()
+    row = conn.execute("SELECT value FROM settings WHERE key = 'registration_open'").fetchone()
+    conn.close()
+    return row is not None and row["value"] == "1"
+
+def is_admin():
+    u = current_user()
+    return u is not None and u["role"] == "admin"
+
+def is_agent():
+    user = current_user()
+    return user is not None and user["role"] == "agent"
+
+
+@app.get("/dashboard")
+def dashboard():
+    if not is_logged_in():
+        # next=request.url — чтобы при желании можно было потом вернуть пользователя обратно
+        return redirect(url_for("login_form", next=request.url))
+
+    user = current_user()
+    if user is None:
+        # На всякий случай: если user_id в сессии битый
+        session.clear()
+        return redirect(url_for("login_form"))
+
+    return render_template("dashboard.html", user=user)
+
+@app.route("/")
+def home():
+    if not is_logged_in():
+        return redirect(url_for("login_form"))
+
+    conn = get_conn()
+    row = conn.execute("SELECT 1 AS ok").fetchone()
+    conn.close()
+
+    db_ok = row is not None and row["ok"] == 1
+    return render_template("home.html", db_ok=db_ok)
 
 @app.get("/logout")
 def logout():
     session.clear()
     return redirect(url_for("home"))
-    
-    # Успешный вход
+
+@app.get("/login")
+def login_form():
+    if is_logged_in():
+        return redirect(url_for("home"))
+    # На этом шаге сессией ещё не пользуемся — просто показываем форму
+    return render_template("login.html", error=None)
+
+
+
+@app.post("/login")
+def login():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+
+    if not username or not password:
+        return render_template(
+            "login.html",
+            error="Введите логин и пароль.",
+        )
+
+    conn = get_conn()
+    user = conn.execute(
+        "SELECT * FROM users WHERE username = ? AND archived_at IS NULL LIMIT 1",
+        (username,),
+    ).fetchone()
+    conn.close()
+
+    if user is None:
+        return render_template(
+            "login.html",
+            error="Пользователь не найден.",
+        )
+
+    if not check_password_hash(user["password"], password):
+        return render_template(
+            "login.html",
+            error="Неверный пароль.",
+        )
+
+    # Пароль подошёл — запоминаем пользователя в сессии
     session.clear()
     session["user_id"] = user["id"]
     session["role"] = user["role"]
-    next_url = request.form.get("next") or "/"
-    return redirect(next_url)
 
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.get("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("home")) 
+    # На этом шаге можно просто отправить на главную
+    return redirect(url_for("home"))
 
 
 #password_hash = generate_password_hash(plain_password)
 # затем в INSERT: (..., password_hash, ...)
   # if not check_password_hash(user["password_hash"], entered_password):
     # пароль неверный
+
+    session.clear()
+    session["user_id"] = user["id"]
+    session["role"] = user["role"]
+
+    # Теперь после входа отправляем пользователя в дашборд
+    return redirect(url_for("dashboard"))
+
+@app.get("/admin/users")
+def admin_users():
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+    if not is_admin():
+        abort(403)
+
+    conn = get_conn()
+    users = conn.execute(
+        """
+        SELECT id, username, role, archived_at, created_at
+        FROM users
+        ORDER BY archived_at IS NULL DESC, username
+        """
+    ).fetchall()
+    conn.close()
+
+    return render_template("admin_users.html", users=users)
+
+@app.get("/admin/settings")
+def admin_settings():
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+    if not is_admin():
+        abort(403)
+    return render_template("admin_settings.html", registration_open=get_registration_open())
+
+
+@app.post("/admin/users/create")
+def admin_user_create():
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+    if not is_admin():
+        abort(403)
+
+    username = (request.form.get("username") or "").strip()
+    password = request.form.get("password") or ""
+
+    if not username or not password:
+        flash("Введите логин и пароль.")
+        return redirect(url_for("admin_users"))
+
+    if len(username) < 2:
+        flash("Логин слишком короткий.")
+        return redirect(url_for("admin_users"))
+
+    try:
+        # В универсальном варианте создаём пользователей с ролью 'user'
+        create_user(username, password, "user")
+        flash(f"Пользователь {username} создан.")
+    except sqlite3.IntegrityError:
+        flash("Такой логин уже занят.")
+
+    return redirect(url_for("admin_users"))
+
+@app.post("/admin/users/<int:user_id>/archive")
+def admin_user_archive(user_id):
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+    if not is_admin():
+        abort(403)
+
+    conn = get_conn()
+    u = conn.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+    if u is None:
+        conn.close()
+        abort(404)
+
+    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute("UPDATE users SET archived_at = ? WHERE id = ?", (now, user_id))
+    conn.commit()
+    conn.close()
+
+    flash("Пользователь заархивирован. Он больше не сможет войти.")
+    return redirect(url_for("admin_users"))
+
+
+
+@app.get("/register")
+def register_form():
+    if session.get("user_id") is not None:
+        return redirect(url_for("dashboard"))
+    if not get_registration_open():
+        return render_template("register.html", registration_disabled=True), 403
+    return render_template("register.html")
+
+
+@app.post("/register")
+def register():
+    if not get_registration_open():
+        return render_template("register.html", registration_disabled=True), 403
+    username = (request.form.get("username") or "").strip()
+    password = request.form.get("password") or ""
+    if not username or not password:
+        return render_template("register.html", error="Username and password required."), 400
+    if len(username) < 2:
+        return render_template("register.html", error="Username too short."), 400
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'agent')",
+            (username, generate_password_hash(password)),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return render_template("register.html", error="Username already taken."), 409
+    conn.close()
+    return redirect(url_for("login_form"))
+
+@app.context_processor
+def inject():
+    return {
+        "current_user": current_user,
+        "is_admin": is_admin,
+        #"is_agent": is_agent,
+        "registration_open": get_registration_open(),
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -174,5 +388,8 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
+    insert_test_user() # временно: добавим одного пользователя для проверки
+    # По желанию: посмотреть содержимое таблицы в консоли
+    print(show_table())
     ensure_master()
     app.run(debug=True)
