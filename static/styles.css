@@ -1,10 +1,11 @@
-body { font-family: sans-serif; margin: 20px; }
-h1 { color: #b7ee78; }
+body { font-family: sans-serif; margin: 20px; color: #c165d8; background-color: #ffd1ff;}
+h1 { color: #e478ee; }
 .flash-message {
   padding: 12px 16px;
   margin: 5px 0;
-  border: 1px solid #ccc;
+  border: 1px solid #ffa1f3;
   border-radius: 4px;
-  background-color: #f9f9f9;
-  color: #333;
+  background-color: #f8c3ff;
+  color: #720063;
 }
+button{color: #dd94d7; background-color: #c378ee;}
