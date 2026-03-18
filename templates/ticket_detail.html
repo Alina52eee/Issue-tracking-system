@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Заявка #{{ ticket.id }}{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h1>Заявка #{{ ticket.id }}</h1>
+
+    <p><strong>Заголовок:</strong> {{ ticket.title }}</p>
+
+    <p>
+      <strong>Статус:</strong> {{ ticket.status }}<br />
+      <strong>Приоритет:</strong> {{ ticket.priority }}
+    </p>
+
+    <p>
+      <strong>Автор:</strong>
+      {% if ticket.reporter_id and not ticket.reporter_archived %}
+        {{ ticket.reporter_username }}
+      {% elif ticket.reporter_id %}
+        Удалённый пользователь
+      {% else %}
+        —
+      {% endif %}
+      <br />
+      <strong>Исполнитель:</strong>
+      {% if ticket.assignee_id %}
+        {% if not ticket.assignee_archived %}
+          {{ ticket.assignee_username }}
+        {% else %}
+          Удалённый пользователь
+        {% endif %}
+      {% else %}
+        —
+      {% endif %}
+    </p>
+
+    <p>
+      <strong>Создана:</strong> {{ ticket.created_at }}<br />
+      {% if ticket.updated_at %}
+        <strong>Обновлена:</strong> {{ ticket.updated_at }}
+      {% endif %}
+      {% if ticket.closed_at %}
+        <br /><strong>Закрыта:</strong> {{ ticket.closed_at }}
+      {% endif %}
+    </p>
+
+    <h2>Описание</h2>
+    <pre>{{ ticket.description }}</pre>
+
+    <p style="margin-top: 16px;">
+      <a href="{{ url_for('ticket_list') }}">К списку заявок</a>
+    </p>
+  </section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Заявки проекта{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h2>Заявки проекта</h2>
+
+    <p>
+      <a href="{{ url_for('project_detail', project_id=project_id) }}">Назад к проекту</a>
+    </p>
+
+    <p>
+      <a href="{{ url_for('ticket_new', project_id=project_id) }}" class="btn btn-primary">
+        Новая заявка
+      </a>
+    </p>
+
+    {% if not tickets %}
+      <p class="muted">В этом проекте пока нет заявок.</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Заголовок</th>
+            <th>Статус</th>
+            <th>Приоритет</th>
+            <th>Создана</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tickets %}
+            <tr>
+              <td>
+                <a href="{{ url_for('ticket_detail', project_id=project_id, ticket_id=t.id) }}">
+                  {{ t.id }}
+                </a>
+              </td>
+              <td>
+                <a href="{{ url_for('ticket_detail', project_id=project_id, ticket_id=t.id) }}">
+                  {{ t.title }}
+                </a>
+              </td>
+              <td>{{ t.status }}</td>
+              <td>{{ t.priority }}</td>
+              <td>{{ t.created_at[:10] if t.created_at else '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endblock %}

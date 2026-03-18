@@ -44,19 +44,6 @@ def login_view():
     session["role"] = user["role"]
 
     # На этом шаге можно просто отправить на главную
-    return redirect(url_for("home"))
-
-
-#password_hash = generate_password_hash(plain_password)
-# затем в INSERT: (..., password_hash, ...)
-  # if not check_password_hash(user["password_hash"], entered_password):
-    # пароль неверный
-
-    session.clear()
-    session["user_id"] = user["id"]
-    session["role"] = user["role"]
-
-    # Теперь после входа отправляем пользователя в дашборд
     return redirect(url_for("dashboard"))
 
 def logout_view():
@@ -82,7 +69,7 @@ def register_view():
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, 'agent')",
+            "INSERT INTO users (username, password, role) VALUES (?, ?, 'user')",
             (username, generate_password_hash(password)),
         )
         conn.commit()

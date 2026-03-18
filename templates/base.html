@@ -12,9 +12,11 @@
         <a href="{{ url_for('home') }}">Главная</a>
 
         {% if current_user() %}
-          <a href="{{ url_for('dashboard') }}">Дашборд</a>
+         <a href="{{ url_for('dashboard') }}">Дашборд</a>
+         <a href="{{ url_for('projects_list') }}">Проекты</a>
+        
 
-       {% if is_admin() %}
+        {% if is_admin() %}
           <a href="{{ url_for('admin_settings') }}">Настройки</a>
           <a href="{{ url_for('admin_users') }}">Пользователи</a>
         {% endif %}

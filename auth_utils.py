@@ -77,17 +77,6 @@ def ensure_master():
 
     conn.close()
 
-def get_registration_open():
-    conn = get_conn()
-    row = conn.execute("SELECT value FROM settings WHERE key = 'registration_open'").fetchone()
-    conn.close()
-    return row is not None and row["value"] == "1"
-
 def is_admin():
     u = current_user()
     return u is not None and u["role"] == "admin"
-
-def is_agent():
-    user = current_user()
-    return user is not None and user["role"] == "agent"
-

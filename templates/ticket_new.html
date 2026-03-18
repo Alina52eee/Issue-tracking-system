@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Новая заявка{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h2>Новая заявка</h2>
+
+    <p>
+      <a href="{{ url_for('project_detail', project_id=project_id) }}">Назад к проекту</a>
+    </p>
+
+    {% if error %}
+      <p class="bad">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('ticket_create', project_id=project_id) }}" class="form">
+      <div class="form-group">
+        <label for="title">Заголовок</label>
+        <input type="text" id="title" name="title" required />
+      </div>
+
+      <div class="form-group">
+        <label for="description">Описание</label>
+        <textarea id="description" name="description" rows="5"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="priority">Приоритет</label>
+        <select id="priority" name="priority">
+          <option value="Low">Low</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="High">High</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Создать заявку</button>
+    </form>
+  </section>
+{% endblock %}

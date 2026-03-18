@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Проект #{{ project.id }} · Учебное веб‑приложение{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h2>Проект #{{ project.id }} — {{ project.title }}</h2>
+
+    {% if project.description %}
+      <p>{{ project.description }}</p>
+    {% endif %}
+
+    <p>
+      <strong>Создан:</strong> {{ project.created_at }}
+    </p>
+
+    <p style="margin-top: 12px;">
+      <a href="{{ url_for('projects_list') }}">К списку проектов</a>
+    </p>
+  </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h3>Заявки этого проекта</h3>
+
+    <p>
+      <a href="{{ url_for('ticket_new', project_id=project.id) }}" class="btn btn-primary">
+        Новая заявка
+      </a>
+    </p>
+
+    {% if not tickets %}
+      <p class="muted">В этом проекте пока нет заявок.</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Заголовок</th>
+            <th>Статус</th>
+            <th>Приоритет</th>
+            <th>Автор</th>
+            <th>Создана</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tickets %}
+            <tr>
+              <td>
+                <a href="{{ url_for('ticket_detail', project_id=project.id, ticket_id=t.id) }}">
+                  {{ t.id }}
+                </a>
+              </td>
+              <td>
+                <a href="{{ url_for('ticket_detail', project_id=project.id, ticket_id=t.id) }}">
+                  {{ t.title }}
+                </a>
+              </td>
+              <td>{{ t.status }}</td>
+              <td>{{ t.priority }}</td>
+              <td>{{ t.reporter_username or '—' }}</td>
+              <td>{{ t.created_at[:10] if t.created_at else '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endblock %}
