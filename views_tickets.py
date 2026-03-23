@@ -1,7 +1,8 @@
 from flask import render_template, redirect, url_for, request, abort
-
+from project_members import can_create_ticket
 from db import get_conn
 from auth_utils import is_logged_in, current_user, is_admin
+from project_members import can_view_project, can_edit_ticket_in_project, can_create_ticket
 
 
 def tickets_for_project(project_id, user):
@@ -69,7 +70,15 @@ def can_view_ticket(ticket_id):
 
     conn = get_conn()
     t = conn.execute(
-        "SELECT id, reporter_id, assignee_id FROM tickets WHERE id = ?",
+        """
+        SELECT
+            id,
+            reporter_id,
+            assignee_id,
+            project_id
+        FROM tickets
+        WHERE id = ?
+        """,
         (ticket_id,),
     ).fetchone()
     conn.close()
@@ -77,13 +86,15 @@ def can_view_ticket(ticket_id):
     if t is None:
         return False, None
 
+    # Админ по‑прежнему видит все заявки
     if is_admin():
         return True, t
 
-    if t["reporter_id"] == user["id"] or t["assignee_id"] == user["id"]:
-        return True, t
+    # Остальные — только если они участники проекта
+    if not can_view_project(t["project_id"]):
+        return False, None
 
-    return False, None
+    return True, t
 
 
 def can_edit_ticket(ticket_id):
@@ -97,7 +108,15 @@ def can_edit_ticket(ticket_id):
 
     conn = get_conn()
     t = conn.execute(
-        "SELECT reporter_id, assignee_id FROM tickets WHERE id = ?",
+        """
+        SELECT
+            id,
+            reporter_id,
+            assignee_id,
+            project_id
+        FROM tickets
+        WHERE id = ?
+        """,
         (ticket_id,),
     ).fetchone()
     conn.close()
@@ -105,7 +124,7 @@ def can_edit_ticket(ticket_id):
     if t is None:
         return False
 
-    return t["reporter_id"] == user["id"] or t["assignee_id"] == user["id"]
+    return can_edit_ticket_in_project(t)
 
 def ticket_list_view(project_id):
     if not is_logged_in():
@@ -163,17 +182,18 @@ def ticket_create_view(project_id):
     return redirect(url_for("ticket_list", project_id=project_id))
 
 
-def ticket_detail_view(project_id: int, ticket_id: int):
+def ticket_detail_view(ticket_id: int):
     if not is_logged_in():
         return redirect(url_for("login_form", next=request.url))
 
     can_view, _ = can_view_ticket(ticket_id)
     if not can_view:
+        # Если заявки нет или нет прав — возвращаем 404,
+        # чтобы не раскрывать информацию о существовании заявки.
         abort(404)
 
     conn = get_conn()
-    t = conn.execute(
-        """
+    t = conn.execute("""
         SELECT
             t.id,
             t.title,
@@ -185,25 +205,79 @@ def ticket_detail_view(project_id: int, ticket_id: int):
             t.closed_at,
             t.reporter_id,
             t.assignee_id,
-            t.project_id,
             ru.username AS reporter_username,
-            au.username AS assignee_username
+            ru.archived_at AS reporter_archived,
+            au.username AS assignee_username,
+            au.archived_at AS assignee_archived
         FROM tickets t
         LEFT JOIN users ru ON t.reporter_id = ru.id
         LEFT JOIN users au ON t.assignee_id = au.id
         WHERE t.id = ?
-        """,
-        (ticket_id,),
-    ).fetchone()
+    """, (ticket_id,)).fetchone()
     conn.close()
 
     if t is None or t["project_id"] != project_id:
         abort(404)
+
+    conn = get_conn()
+    comments = conn.execute(
+        """
+        SELECT
+            c.id,
+            c.body,
+            c.created_at,
+            c.user_id,
+            u.username AS author_username
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.ticket_id = ?
+        ORDER BY c.created_at ASC
+        """,
+        (ticket_id,),
+    ).fetchall()
+    conn.close()
+
+    user = current_user()
+    can_comment = (
+        user is not None
+        and can_view_project(project_id)
+    )
 
     return render_template(
         "ticket_detail.html",
         ticket=t,
         can_edit=can_edit_ticket(ticket_id),
         project_id=project_id,
+        comments=comments,
+        can_comment=can_comment,
     )
 
+def comment_create_view(project_id: int, ticket_id: int):
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+
+    # Проверяем, что пользователь вообще может видеть заявку и проект
+    can_view, _ = can_view_ticket(ticket_id)
+    if not can_view:
+        abort(404)
+
+    body = (request.form.get("body") or "").strip()
+    if not body:
+        # Пустые комментарии не сохраняем, просто возвращаемся на страницу заявки
+        return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))
+
+    conn = get_conn()
+    user = current_user()
+    user_id = user["id"] if user is not None else None
+
+    conn.execute(
+        """
+        INSERT INTO comments (ticket_id, user_id, body)
+        VALUES (?, ?, ?)
+        """,
+        (ticket_id, user_id, body),
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))

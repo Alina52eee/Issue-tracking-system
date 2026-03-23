@@ -80,12 +80,37 @@ def init_db():
         )
     """)
 
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_members (
+            project_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('owner', 'maintainer', 'reporter')),
+            PRIMARY KEY (project_id, user_id),
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
     """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            user_id INTEGER,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('registration_open', '0')")
     
     conn.commit()

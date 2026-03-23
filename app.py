@@ -27,12 +27,15 @@ from views_tickets import (
     ticket_new_view,
     ticket_create_view,
     ticket_detail_view,
+    comment_create_view,
 )
 from views_projects import (
     projects_list_view,
     project_new_view,
     project_create_view,
     project_detail_view,
+    project_member_add_view,
+    project_member_remove_view,
 )
 
 
@@ -101,6 +104,10 @@ def ticket_create(project_id):
 def ticket_detail(project_id, ticket_id):
     return ticket_detail_view(project_id, ticket_id)
 
+@app.post("/projects/<int:project_id>/tickets/<int:ticket_id>/comments")
+def comment_create(project_id, ticket_id):
+    return comment_create_view(project_id, ticket_id)
+
 @app.context_processor
 def inject():
     return {
@@ -153,7 +160,14 @@ def register():
 def dashboard():
     return dashboard_view()
 
+@app.post("/projects/<int:project_id>/members/add")
+def project_member_add(project_id):
+    return project_member_add_view(project_id)
 
+
+@app.post("/projects/<int:project_id>/members/<int:user_id>/remove")
+def project_member_remove(project_id, user_id):
+    return project_member_remove_view(project_id, user_id)
 
 
 

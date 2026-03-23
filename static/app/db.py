@@ -23,7 +23,49 @@ def init_db():
             archived_at TEXT,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
         )
-    """)  # Добавлены скобки () и правильно закрыта строка
+    """)  
+    
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            FOREIGN KEY (owner_id) REFERENCES users(id)
+        )
+    """)
+    
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            reporter_id INTEGER,
+            assignee_id INTEGER,
+            project_id INTEGER,  -- новое поле
+            status TEXT NOT NULL DEFAULT 'Open',
+            priority TEXT NOT NULL DEFAULT 'Medium',
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            closed_at TEXT,
+            deleted_at TEXT,
+            FOREIGN KEY (reporter_id) REFERENCES users(id),
+            FOREIGN KEY (assignee_id) REFERENCES users(id),
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_members (
+            project_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('owner', 'maintainer', 'reporter')),
+            PRIMARY KEY (project_id, user_id),
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
     
     conn.execute("""
         CREATE TABLE IF NOT EXISTS settings (

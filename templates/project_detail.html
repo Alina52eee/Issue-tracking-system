@@ -66,3 +66,93 @@
     {% endif %}
   </section>
 {% endblock %}
+
+  <section class="card" style="margin-top: 16px;">
+    <h3>Участники проекта</h3>
+
+    {% if not members %}
+      <p class="muted">В этом проекте пока нет участников, кроме владельца.</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Логин</th>
+            <th>Роль</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+            <tr>
+              <td>{{ m.user_id }}</td>
+              <td>{{ m.username }}</td>
+              <td>{{ m.role }}</td>
+              <td>
+                {% if m.archived_at %}
+                  <span class="badge badge-deleted">В архиве</span>
+                {% else %}
+                  Активен
+                {% endif %}
+              </td>
+              <td>
+                {% if project_role == 'owner' and m.role != 'owner' %}
+                  <form
+                    method="post"
+                    action="{{ url_for('project_member_remove', project_id=project.id, user_id=m.user_id) }}"
+                    class="inline-form"
+                  >
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-danger"
+                      onclick="return confirm('Удалить участника из проекта?')"
+                    >
+                      Удалить
+                    </button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if project_role == 'owner' %}
+      <hr />
+      <h4>Добавить участника</h4>
+
+      <form
+        method="post"
+        action="{{ url_for('project_member_add', project_id=project.id) }}"
+        class="form form-row"
+      >
+        <div class="form-group">
+          <label for="user_id">Пользователь</label>
+          <select id="user_id" name="user_id" required>
+            {% for u in candidate_users %}
+              <option value="{{ u.id }}">{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="role">Роль</label>
+          <select id="role" name="role">
+            <option value="maintainer">maintainer</option>
+            <option value="reporter">reporter</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="align-self: flex-end;">
+          <button type="submit" class="btn btn-primary">Добавить участника</button>
+        </div>
+      </form>
+
+      <p class="muted" style="margin-top: 8px;">
+        Владелец (owner) задаётся автоматически при создании проекта и не может быть удалён через этот интерфейс.
+        Список в выпадающем меню показывает только активных пользователей, которые ещё не добавлены в проект.
+      </p>
+    {% endif %}
+  </section>

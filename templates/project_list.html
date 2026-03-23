@@ -10,8 +10,8 @@
       <a href="{{ url_for('project_new') }}" class="btn btn-primary">Новый проект</a>
     </p>
 
-    {% if not projects %}
-      <p class="muted">У вас пока нет проектов.</p>
+    {% if not my_projects %}
+      <p class="muted">У вас пока нет собственных проектов.</p>
     {% else %}
       <table class="table">
         <thead>
@@ -23,7 +23,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for p in projects %}
+          {% for p in my_projects %}
             <tr>
               <td>
                 <a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.id }}</a>
@@ -39,4 +39,38 @@
       </table>
     {% endif %}
   </section>
+
+  <section class="card" style="margin-top: 16px;">
+    <h2>Проекты, где я участвую</h2>
+
+    {% if not collaborating_projects %}
+      <p class="muted">Вы пока не добавлены ни в один чужой проект.</p>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Моя роль</th>
+            <th>Создан</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in collaborating_projects %}
+            <tr>
+              <td>
+                <a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.id }}</a>
+              </td>
+              <td>
+                <a href="{{ url_for('project_detail', project_id=p.id) }}">{{ p.title }}</a>
+              </td>
+              <td>{{ p.role }}</td>
+              <td>{{ p.created_at[:10] if p.created_at else '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
 {% endblock %}
+  </section>
