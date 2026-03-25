@@ -28,6 +28,48 @@
       </a>
     </p>
 
+
+      <p style="margin-top: 12px;">
+      <a href="{{ url_for('projects_list') }}">К списку проектов</a>
+    </p>
+
+    {% if project_role == 'owner' %}
+      <form
+        method="post"
+        action="{{ url_for('project_archive', project_id=project.id) }}"
+        class="inline-form"
+      >
+        {% if not project.is_archived %}
+          <button
+            type="submit"
+            class="btn btn-sm"
+            onclick="return confirm('Отправить проект в архив? Заявки и комментарии станут только для чтения.')"
+          >
+            Архивировать проект
+          </button>
+        {% else %}
+          <button type="submit" class="btn btn-sm">Восстановить проект</button>
+        {% endif %}
+      </form>
+
+      {% if project.is_archived %}
+        <form
+          method="post"
+          action="{{ url_for('project_delete', project_id=project.id) }}"
+          class="inline-form"
+          style="margin-left: 8px;"
+        >
+          <button
+            type="submit"
+            class="btn btn-sm btn-danger"
+            onclick="return confirm('Удалить проект и все связанные данные безвозвратно?')"
+          >
+            Удалить проект
+          </button>
+        </form>
+      {% endif %}
+    {% endif %}
+
     {% if not tickets %}
       <p class="muted">В этом проекте пока нет заявок.</p>
     {% else %}
@@ -156,3 +198,10 @@
       </p>
     {% endif %}
   </section>
+
+    <p>
+      <strong>Создан:</strong> {{ project.created_at }}
+      {% if project.is_archived %}
+        <span class="badge badge-deleted">В архиве</span>
+      {% endif %}
+    </p>

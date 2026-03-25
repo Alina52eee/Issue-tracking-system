@@ -1,16 +1,22 @@
 from flask import render_template, redirect, url_for, request, abort
 from project_members import can_create_ticket
 from db import get_conn
+from views_projects import get_project  # если нужно
 from auth_utils import is_logged_in, current_user, is_admin
 from project_members import can_view_project, can_edit_ticket_in_project, can_create_ticket
+from views_projects import get_project
+from history_utils import log_issue_event
 
+def tickets_for_project(project_id):
+    """Вернуть все заявки этого проекта с учетом роли текущего пользователя (admin/не admin)."""
+    user = current_user()
+    if user is None:
+        return []
 
-def tickets_for_project(project_id, user):
-    """Вернуть все заявки этого проекта с учетом роли пользователя."""
     conn = get_conn()
     try:
-        if user["is_admin"]:
-            # Админ / менеджер видит все заявки проекта
+        if is_admin():
+            # Админ/менеджер видит все заявки проекта
             rows = conn.execute(
                 """
                 SELECT
@@ -32,7 +38,8 @@ def tickets_for_project(project_id, user):
                 (project_id,),
             ).fetchall()
         else:
-            # Обычный пользователь видит заявки, где он автор или исполнитель
+            # Остальные видят только заявки, где они автор или исполнитель
+            # (тут логика может отличаться от требований, но это НЕ про падение — это про “какие заявки покажут”)
             rows = conn.execute(
                 """
                 SELECT
@@ -171,31 +178,41 @@ def ticket_create_view(project_id):
     user = current_user()
 
     conn = get_conn()
-    conn.execute(
+    cursor = conn.execute(
         "INSERT INTO tickets (title, description, reporter_id, project_id, status, priority) "
         "VALUES (?, ?, ?, ?, 'Open', ?)",
         (title, description, user["id"], project_id, priority),
     )
+    ticket_id = cursor.lastrowid
     conn.commit()
     conn.close()
+
+    log_issue_event(
+        ticket_id,
+        "created",
+        {
+            "project_id": project_id,
+            "title": title,
+            "priority": priority,
+        },
+    )
 
     return redirect(url_for("ticket_list", project_id=project_id))
 
 
-def ticket_detail_view(ticket_id: int):
+def ticket_detail_view(project_id: int, ticket_id: int):
     if not is_logged_in():
         return redirect(url_for("login_form", next=request.url))
 
     can_view, _ = can_view_ticket(ticket_id)
     if not can_view:
-        # Если заявки нет или нет прав — возвращаем 404,
-        # чтобы не раскрывать информацию о существовании заявки.
         abort(404)
 
     conn = get_conn()
     t = conn.execute("""
         SELECT
             t.id,
+            t.project_id,           -- ВАЖНО: нужен для проверки и отладки
             t.title,
             t.description,
             t.status,
@@ -235,7 +252,24 @@ def ticket_detail_view(ticket_id: int):
         """,
         (ticket_id,),
     ).fetchall()
-    conn.close()
+    
+
+    history = conn.execute(
+        """
+        SELECT
+            h.id,
+            h.action_type,
+            h.data,
+            h.created_at,
+            h.user_id,
+            u.username AS author_username
+        FROM issue_history h
+        LEFT JOIN users u ON h.user_id = u.id
+        WHERE h.ticket_id = ?
+        ORDER BY h.created_at DESC
+        """,
+        (ticket_id,),
+    ).fetchall()
 
     user = current_user()
     can_comment = (
@@ -243,6 +277,7 @@ def ticket_detail_view(ticket_id: int):
         and can_view_project(project_id)
     )
 
+    conn.close()
     return render_template(
         "ticket_detail.html",
         ticket=t,
@@ -250,6 +285,7 @@ def ticket_detail_view(ticket_id: int):
         project_id=project_id,
         comments=comments,
         can_comment=can_comment,
+        history=history,
     )
 
 def comment_create_view(project_id: int, ticket_id: int):
@@ -281,3 +317,28 @@ def comment_create_view(project_id: int, ticket_id: int):
     conn.close()
 
     return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))
+
+    conn.execute(
+        """
+        INSERT INTO comments (ticket_id, user_id, body)
+        VALUES (?, ?, ?)
+        """,
+        (ticket_id, user_id, body),
+    )
+    conn.commit()
+    conn.close()
+
+    log_issue_event(
+        ticket_id,
+        "comment_added",
+        {
+            "project_id": project_id,
+            "snippet": body[:100],
+        },
+    )
+
+    return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))
+
+    project = get_project(project_id)
+    if project is None or project["is_archived"]:
+        abort(403)

@@ -143,10 +143,14 @@ def project_detail_view(project_id):
     if user is None:
         return redirect(url_for("login_form"))
 
+    # ВАЖНО: проект должен быть загружен, иначе ниже будет project=project (не определено)
+    project = get_project(project_id)
+    if project is None:
+        abort(404)
 
-        conn = get_conn()
+    conn = get_conn()
 
-    # Заявки проекта (как в Части G)
+    # Заявки проекта
     tickets = conn.execute(
         """
         SELECT
@@ -200,6 +204,7 @@ def project_detail_view(project_id):
     ).fetchall()
 
     conn.close()
+
     return render_template(
         "project_detail.html",
         project=project,
@@ -321,3 +326,110 @@ def project_member_remove_view(project_id, user_id):
 
     flash(f"Пользователь {member['username']} удалён из проекта.")
     return redirect(url_for("project_detail", project_id=project_id))
+
+def project_archive_view(project_id):
+    """Заархивировать проект (owner)."""
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+
+    project = get_project(project_id)
+    if project is None:
+        abort(404)
+
+    if not can_manage_members(project_id):
+        abort(403)
+
+    conn = get_conn()
+    conn.execute(
+        "UPDATE projects SET is_archived = 1 WHERE id = ?",
+        (project_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Проект отправлен в архив. Заявки и комментарии стали только для чтения.")
+    return redirect(url_for("project_detail", project_id=project_id))
+
+
+def project_restore_view(project_id):
+    """Восстановить проект из архива (owner)."""
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+
+    project = get_project(project_id)
+    if project is None:
+        abort(404)
+
+    if not can_manage_members(project_id):
+        abort(403)
+
+    conn = get_conn()
+    conn.execute(
+        "UPDATE projects SET is_archived = 0 WHERE id = ?",
+        (project_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Проект восстановлен из архива.")
+    return redirect(url_for("project_detail", project_id=project_id))
+
+
+def project_delete_view(project_id):
+    """Полностью удалить проект и связанные данные (owner)."""
+    if not is_logged_in():
+        return redirect(url_for("login_form", next=request.url))
+
+    project = get_project(project_id)
+    if project is None:
+        abort(404)
+
+    if not can_manage_members(project_id):
+        abort(403)
+
+    conn = get_conn()
+
+    # Находим все заявки этого проекта
+    ticket_ids = [
+        row["id"]
+        for row in conn.execute(
+            "SELECT id FROM tickets WHERE project_id = ?",
+            (project_id,),
+        ).fetchall()
+    ]
+
+    if ticket_ids:
+        placeholders = ",".join("?" for _ in ticket_ids)
+
+        # Удаляем комментарии и историю для этих заявок
+        conn.execute(
+            f"DELETE FROM comments WHERE ticket_id IN ({placeholders})",
+            ticket_ids,
+        )
+        conn.execute(
+            f"DELETE FROM issue_history WHERE ticket_id IN ({placeholders})",
+            ticket_ids,
+        )
+
+        # Удаляем сами заявки
+        conn.execute(
+            f"DELETE FROM tickets WHERE id IN ({placeholders})",
+            ticket_ids,
+        )
+
+    # Удаляем участников проекта и сам проект
+    conn.execute(
+        "DELETE FROM project_members WHERE project_id = ?",
+        (project_id,),
+    )
+    conn.execute(
+        "DELETE FROM projects WHERE id = ?",
+        (project_id,),
+    )
+
+    conn.commit()
+    conn.close()
+
+    flash("Проект и все связанные данные удалены безвозвратно.")
+    return redirect(url_for("projects_list"))
+

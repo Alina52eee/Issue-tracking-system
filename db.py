@@ -111,6 +111,19 @@ def init_db():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issue_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticket_id INTEGER NOT NULL,
+            user_id INTEGER,
+            action_type TEXT NOT NULL,
+            data TEXT,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('registration_open', '0')")
     
     conn.commit()

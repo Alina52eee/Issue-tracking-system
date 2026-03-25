@@ -36,6 +36,9 @@ from views_projects import (
     project_detail_view,
     project_member_add_view,
     project_member_remove_view,
+    project_archive_view,
+    project_restore_view,
+    project_delete_view,
 )
 
 
@@ -168,6 +171,21 @@ def project_member_add(project_id):
 @app.post("/projects/<int:project_id>/members/<int:user_id>/remove")
 def project_member_remove(project_id, user_id):
     return project_member_remove_view(project_id, user_id)
+
+@app.post("/projects/<int:project_id>/archive")
+def project_archive(project_id):
+    return project_archive_view(project_id)
+
+
+@app.post("/projects/<int:project_id>/restore")
+def project_restore(project_id):
+    return project_restore_view(project_id)
+
+
+@app.post("/projects/<int:project_id>/delete")
+def project_delete(project_id):
+    return project_delete_view(project_id)
+
 
 
 
