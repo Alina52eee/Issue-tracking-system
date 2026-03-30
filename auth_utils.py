@@ -2,6 +2,7 @@ from flask import session
 from werkzeug.security import check_password_hash, generate_password_hash 
 from datetime import datetime 
 from db import get_conn
+import os
 
 def is_logged_in():
     return session.get("user_id") is not None
@@ -65,17 +66,26 @@ def get_registration_open():
 def ensure_master():
     """
     Убедиться, что в системе есть хотя бы один администратор.
-    Если нет — создать пользователя master/master с ролью admin.
+    Если нет — создать из ADMIN_USERNAME / ADMIN_PASSWORD.
     """
     conn = get_conn()
     row = conn.execute(
         "SELECT id FROM users WHERE role = 'admin' AND archived_at IS NULL LIMIT 1"
     ).fetchone()
-
-    if row is None:
-        create_user("master", "master", "admin")
-
     conn.close()
+
+    if row is not None:
+        return
+
+    username = os.getenv("ADMIN_USERNAME", "").strip()
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+
+    if not username or not password:
+        raise RuntimeError(
+            "Не заданы ADMIN_USERNAME / ADMIN_PASSWORD в .env для создания первого администратора."
+        )
+
+    create_user(username, password, "admin")
 
 def is_admin():
     u = current_user()

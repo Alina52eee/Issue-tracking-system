@@ -12,6 +12,9 @@
 
     <p>
       <strong>Создан:</strong> {{ project.created_at }}
+      {% if project.is_archived %}
+        <span class="badge badge-deleted">В архиве</span>
+      {% endif %}
     </p>
 
     <p style="margin-top: 12px;">
@@ -28,18 +31,9 @@
       </a>
     </p>
 
-
-      <p style="margin-top: 12px;">
-      <a href="{{ url_for('projects_list') }}">К списку проектов</a>
-    </p>
-
     {% if project_role == 'owner' %}
-      <form
-        method="post"
-        action="{{ url_for('project_archive', project_id=project.id) }}"
-        class="inline-form"
-      >
-        {% if not project.is_archived %}
+      {% if not project.is_archived %}
+        <form method="post" action="{{ url_for('project_archive', project_id=project.id) }}" class="inline-form">
           <button
             type="submit"
             class="btn btn-sm"
@@ -47,12 +41,12 @@
           >
             Архивировать проект
           </button>
-        {% else %}
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('project_restore', project_id=project.id) }}" class="inline-form">
           <button type="submit" class="btn btn-sm">Восстановить проект</button>
-        {% endif %}
-      </form>
+        </form>
 
-      {% if project.is_archived %}
         <form
           method="post"
           action="{{ url_for('project_delete', project_id=project.id) }}"
@@ -107,7 +101,6 @@
       </table>
     {% endif %}
   </section>
-{% endblock %}
 
   <section class="card" style="margin-top: 16px;">
     <h3>Участники проекта</h3>
@@ -198,10 +191,4 @@
       </p>
     {% endif %}
   </section>
-
-    <p>
-      <strong>Создан:</strong> {{ project.created_at }}
-      {% if project.is_archived %}
-        <span class="badge badge-deleted">В архиве</span>
-      {% endif %}
-    </p>
+{% endblock %}

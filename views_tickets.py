@@ -145,6 +145,10 @@ def ticket_new_view(project_id):
     if not is_logged_in():
         return redirect(url_for("login_form", next=request.url))
 
+    project = get_project(project_id)
+    if project is None or project["is_archived"]:
+        abort(403)
+
       # Проверяем, что проект существует и принадлежит пользователю
     project = get_project(project_id)
     if project is None:
@@ -153,13 +157,17 @@ def ticket_new_view(project_id):
         abort(403)
 
     return render_template("ticket_new.html", 
-                         project_id=project_id,  # ← Обязательно передай!
-                         project=project)        # ← Для удобства
+            project_id=project_id,  # ← Обязательно передай!
+            project=project)        # ← Для удобства
 
 
 def ticket_create_view(project_id):
     if not is_logged_in():
         return redirect(url_for("login_form", next=request.url))
+    
+    project = get_project(project_id)
+    if project is None or project["is_archived"]:
+        abort(403)
 
     title = (request.form.get("title") or "").strip()
     description = (request.form.get("description") or "").strip()
@@ -292,31 +300,21 @@ def comment_create_view(project_id: int, ticket_id: int):
     if not is_logged_in():
         return redirect(url_for("login_form", next=request.url))
 
-    # Проверяем, что пользователь вообще может видеть заявку и проект
     can_view, _ = can_view_ticket(ticket_id)
     if not can_view:
         abort(404)
 
+    project = get_project(project_id)
+    if project is None or project["is_archived"]:
+        abort(403)
+
     body = (request.form.get("body") or "").strip()
     if not body:
-        # Пустые комментарии не сохраняем, просто возвращаемся на страницу заявки
         return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))
 
     conn = get_conn()
     user = current_user()
     user_id = user["id"] if user is not None else None
-
-    conn.execute(
-        """
-        INSERT INTO comments (ticket_id, user_id, body)
-        VALUES (?, ?, ?)
-        """,
-        (ticket_id, user_id, body),
-    )
-    conn.commit()
-    conn.close()
-
-    return redirect(url_for("ticket_detail", project_id=project_id, ticket_id=ticket_id))
 
     conn.execute(
         """

@@ -1,6 +1,8 @@
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask import Flask, request, session, redirect, url_for, render_template, flash, abort  # укажите нужные компоненты
 import sqlite3
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import datetime
 from db import get_conn, init_db, insert_test_user, show_table
 from auth_utils import (create_user, ensure_master, is_logged_in, current_user, is_admin, get_registration_open

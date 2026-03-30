@@ -146,7 +146,10 @@ def project_detail_view(project_id):
     # ВАЖНО: проект должен быть загружен, иначе ниже будет project=project (не определено)
     project = get_project(project_id)
     if project is None:
-        abort(404)
+       abort(404)
+
+    if not can_view_project(project_id):
+       abort(403)
 
     conn = get_conn()
 
@@ -222,6 +225,9 @@ def project_member_add_view(project_id):
     project = get_project(project_id)
     if project is None:
         abort(404)
+    
+    if project["is_archived"]:
+        abort(403)
 
     if not can_manage_members(project_id):
         abort(403)
@@ -285,6 +291,9 @@ def project_member_remove_view(project_id, user_id):
     project = get_project(project_id)
     if project is None:
         abort(404)
+    
+    if project["is_archived"]:
+        abort(403)
 
     if not can_manage_members(project_id):
         abort(403)

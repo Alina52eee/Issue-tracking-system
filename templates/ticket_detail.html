@@ -52,11 +52,9 @@
       <a href="{{ url_for('ticket_list', project_id=project_id) }}">К списку заявок</a>
     </p>
   </section>
-{% endblock %}
 
   <section class="card" style="margin-top: 16px;">
     <h3>Комментарии</h3>
-
     {% if not comments %}
       <p class="muted">Пока нет ни одного комментария.</p>
     {% else %}
@@ -65,9 +63,7 @@
           <li class="comment-item">
             <div class="comment-meta">
               <strong>{{ c.author_username or 'System' }}</strong>
-              <span class="comment-date">
-                {{ c.created_at[:19] if c.created_at else '' }}
-              </span>
+              <span class="comment-date">{{ c.created_at[:19] if c.created_at else '' }}</span>
             </div>
             <pre class="comment-body">{{ c.body }}</pre>
           </li>
@@ -78,29 +74,20 @@
     {% if can_comment %}
       <hr />
       <h4>Добавить комментарий</h4>
-
-      <form
-        method="post"
-        action="{{ url_for('comment_create', project_id=project_id, ticket_id=ticket.id) }}"
-        class="form"
-      >
+      <form method="post" action="{{ url_for('comment_create', project_id=project_id, ticket_id=ticket.id) }}" class="form">
         <div class="form-group">
           <label for="body">Текст комментария</label>
           <textarea id="body" name="body" rows="3" required></textarea>
         </div>
-
         <button type="submit" class="btn btn-primary">Отправить</button>
       </form>
     {% else %}
-      <p class="muted" style="margin-top: 8px;">
-        Чтобы оставить комментарий, нужно быть участником проекта.
-      </p>
+      <p class="muted" style="margin-top: 8px;">Чтобы оставить комментарий, нужно быть участником проекта.</p>
     {% endif %}
   </section>
 
   <section class="card" style="margin-top: 16px;">
     <h3>История</h3>
-
     {% if not history %}
       <p class="muted">Для этой заявки пока нет записей в истории.</p>
     {% else %}
@@ -108,12 +95,8 @@
         {% for h in history %}
           <li class="history-item">
             <div class="history-meta">
-              <span class="history-date">
-                {{ h.created_at[:19] if h.created_at else '' }}
-              </span>
-              <span class="history-user">
-                {{ h.author_username or 'System' }}
-              </span>
+              <span class="history-date">{{ h.created_at[:19] if h.created_at else '' }}</span>
+              <span class="history-user">{{ h.author_username or 'System' }}</span>
             </div>
             <div class="history-description">
               {% if h.action_type == 'created' %}
@@ -131,3 +114,4 @@
       </ul>
     {% endif %}
   </section>
+{% endblock %}
